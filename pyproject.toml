@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "groq",
+    "psycopg[binary,pool]",
     "pillow",
     "pydantic>=2",
     "python-multipart",

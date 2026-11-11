@@ -27,7 +27,7 @@ p { margin:0; }
 .link { background:none; border:0; color:var(--muted); font:inherit; font-size:.9rem; text-decoration:underline; cursor:pointer; padding:8px 0; }
 .muted { color:var(--muted); }
 label { display:grid; gap:6px; font-size:.9rem; color:var(--muted); margin-top:16px; }
-input[type=text], input[type=password] { font:inherit; font-size:1.05rem; color:var(--ink); padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; width:100%; }
+input[type=text], input[type=password], input[type=tel], select { font:inherit; font-size:1.05rem; color:var(--ink); padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; width:100%; }
 .btn { display:flex; align-items:center; justify-content:center; width:100%; min-height:54px; margin-top:20px; padding:14px 20px; border-radius:999px; border:1px solid var(--forest); background:var(--forest); color:var(--paper); font:500 1.02rem var(--sans); cursor:pointer; }
 .btn[aria-disabled=true], .btn:disabled { opacity:.55; cursor:default; }
 .msg { margin-top:14px; padding:12px 14px; border-radius:12px; font-size:.95rem; }
@@ -79,10 +79,41 @@ input[type=file]:focus-visible + .btn { outline:2px solid var(--brass); outline-
       <button class="btn" type="submit">Sign in</button>
       <div id="login-msg" role="alert"></div>
     </form>
-    <p class="foot">Forgot your PIN? Message the Hanu team.</p>
+    <p class="foot">New to Hanu? <button class="link" type="button" data-go="join">Create your Hanu ID</button></p>
+    <p class="foot" style="margin-top:6px">Forgot your PIN? Message the Hanu team.</p>
+  </main>
+
+  <main id="join" hidden>
+    <h1>Create your Hanu ID</h1>
+    <p class="muted" style="margin-top:10px">Start saving for your own healthcare. Hanu is not insurance: this is your money, kept for care.</p>
+    <form id="join-form">
+      <label>Full name
+        <input type="text" name="name" autocomplete="name" maxlength="80" required>
+      </label>
+      <label>Phone number
+        <input type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="0803 000 0000" required>
+      </label>
+      <label>Lock your savings for
+        <select name="lock_months">
+          <option value="6">Six months</option>
+          <option value="12">One year</option>
+        </select>
+      </label>
+      <label>Choose a PIN (4 to 6 digits)
+        <input type="password" name="pin" inputmode="numeric" autocomplete="new-password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" required>
+      </label>
+      <label>Repeat your PIN
+        <input type="password" name="pin2" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="6" required>
+      </label>
+      <p class="muted" style="margin-top:14px;font-size:.86rem">Savings are locked for the time you choose and are paid only to clinics, never in cash.</p>
+      <button class="btn" type="submit">Create my Hanu ID</button>
+      <div id="join-msg" role="alert"></div>
+    </form>
+    <p class="foot">Already have a Hanu ID? <button class="link" type="button" data-go="login">Sign in</button></p>
   </main>
 
   <main id="home" hidden>
+    <div id="welcome" role="status"></div>
     <section class="card" aria-label="Your Hanu ID and balance">
       <small>Health balance</small>
       <div class="bal" id="balance"></div>
@@ -137,10 +168,11 @@ async function call(path, opts = {}) {
 }
 
 function show(view) {
-  $('login').hidden = view !== 'login';
-  $('home').hidden = view !== 'home';
+  for (const id of ['login', 'join', 'home']) $(id).hidden = view !== id;
   $('signout').hidden = view !== 'home';
+  window.scrollTo(0, 0);
 }
+for (const btn of document.querySelectorAll('[data-go]')) btn.addEventListener('click', () => show(btn.dataset.go));
 
 function render(me) {
   $('balance').textContent = naira(me.balance_kobo);
@@ -210,6 +242,25 @@ $('login-form').addEventListener('submit', async (ev) => {
   btn.disabled = false; btn.textContent = 'Sign in';
 });
 
+$('join-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const form = ev.target, btn = form.querySelector('button');
+  note('join-msg', '', '');
+  if (form.pin.value !== form.pin2.value) return note('join-msg', 'bad', 'The two PINs are not the same.');
+  btn.disabled = true; btn.textContent = 'Creating your Hanu ID…';
+  try {
+    const out = await call('/api/member/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: form.name.value, phone: form.phone.value, pin: form.pin.value, lock_months: Number(form.lock_months.value) }) });
+    setToken(out.token);
+    form.reset();
+    render(await call('/api/member/me'));
+    note('welcome', 'ok', `Welcome. Your Hanu ID is ${out.hanu_id}. Write it down: you need it and your PIN to sign in.`);
+    $('welcome').style.margin = '0 0 16px';
+    show('home');
+  } catch (err) { note('join-msg', 'bad', err.message); }
+  btn.disabled = false; btn.textContent = 'Create my Hanu ID';
+});
+
 let sending = false;
 $('photo').addEventListener('change', async (ev) => {
   const file = ev.target.files[0];
@@ -230,13 +281,14 @@ $('photo').addEventListener('change', async (ev) => {
 });
 
 $('signout').addEventListener('click', async () => {
-  try { await call('/api/member/logout', { method: 'POST' }); } catch {}
-  setToken(null); note('send-msg', '', ''); show('login');
+  try { await call('/api/logout', { method: 'POST' }); } catch {}
+  setToken(null); note('send-msg', '', ''); note('welcome', '', ''); show('login');
 });
 
 (async () => {
-  if (!token) return show('login');
-  try { render(await call('/api/member/me')); show('home'); } catch { show('login'); }
+  const first = location.hash === '#join' ? 'join' : 'login';
+  if (!token) return show(first);
+  try { render(await call('/api/member/me')); show('home'); } catch { show(first); }
 })();
 </script>
 </body>

@@ -72,6 +72,12 @@ td.num { text-align:right; font-variant-numeric:tabular-nums; }
 .audit { font-size:.86rem; }
 .audit li { margin-bottom:6px; }
 .audit code { color:var(--muted); font-size:.8rem; word-break:break-word; }
+.signin { width:min(400px, 100% - 32px); margin:64px auto; }
+.signin h2 { font-size:1.9rem; margin-bottom:8px; }
+.signin label { display:grid; gap:6px; font-size:.86rem; color:var(--muted); margin-top:16px; }
+.signin input { width:100%; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; font-size:1rem; }
+.signin .btn { width:100%; margin-top:20px; padding:13px; }
+[hidden] { display:none !important; }
 @media (max-width: 900px) {
   .layout { grid-template-columns:1fr; }
   .side { border-right:0; border-bottom:1px solid var(--line); }
@@ -86,8 +92,19 @@ td.num { text-align:right; font-variant-numeric:tabular-nums; }
   <span class="brand">hanu<span>.</span></span>
   <h1>Bill review queue</h1>
   <div class="chips" id="chips"></div>
+  <button class="btn ghost" id="signout" hidden>Sign out</button>
 </header>
-<div class="layout">
+<main class="signin" id="signin" hidden>
+  <h2>Team sign in</h2>
+  <p style="color:var(--muted)">For Hanu staff who review bills. Members sign in on the <a href="/member">member page</a>.</p>
+  <form id="signin-form">
+    <label>Email <input type="email" name="email" autocomplete="username" required></label>
+    <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn" type="submit">Sign in</button>
+    <div class="msg" id="signin-msg" role="alert" style="margin-top:12px"></div>
+  </form>
+</main>
+<div class="layout" id="app" hidden>
   <aside class="side">
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-needs_review" aria-selected="true">Needs review</button>
@@ -122,15 +139,24 @@ const naira = (kobo) => kobo === null || kobo === undefined ? '—'
   : '₦' + (kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: kobo % 100 ? 2 : 0 });
 const when = (iso) => iso ? new Date(iso).toLocaleString() : '';
 
-async function api(path, opts = {}, retry = true) {
+let token = null;
+try { token = sessionStorage.getItem('hanuStaff'); } catch {}
+function setToken(value) {
+  token = value;
+  try { value ? sessionStorage.setItem('hanuStaff', value) : sessionStorage.removeItem('hanuStaff'); } catch {}
+}
+function show(signedIn) {
+  $('signin').hidden = signedIn;
+  $('app').hidden = !signedIn;
+  $('signout').hidden = !signedIn;
+  if (!signedIn) $('chips').replaceChildren();
+}
+
+async function api(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
-  const token = sessionStorage.getItem('hanuReviewToken');
-  if (token) headers['X-Review-Token'] = token;
+  if (token) headers.Authorization = 'Bearer ' + token;
   const res = await fetch(path, { ...opts, headers });
-  if (res.status === 401 && retry) {
-    const entered = prompt('Review token');
-    if (entered) { sessionStorage.setItem('hanuReviewToken', entered); return api(path, opts, false); }
-  }
+  if (res.status === 401 && token) { setToken(null); show(false); }
   if (!res.ok) {
     let detail = res.statusText;
     try { const body = await res.json(); detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail); } catch {}
@@ -144,12 +170,13 @@ let tab = 'needs_review', selected = null, settings = { partner_clinics: [] };
 
 async function loadSettings() {
   settings = await getJSON('/api/settings');
-  $('chips').replaceChildren(
+  $('chips').replaceChildren(...[
+    el('span', { class: 'chip' }, 'Signed in as ' + settings.staff_name),
     el('span', { class: 'chip' + (settings.shadow_mode ? '' : ' warn') },
       settings.shadow_mode ? 'Shadow mode: every bill is reviewed' : 'Rules may approve clean bills'),
     settings.extractor === 'mock' ? el('span', { class: 'chip warn' }, 'Mock bill reader') : null,
     settings.storage_is_temporary ? el('span', { class: 'chip warn' }, 'Temporary storage: data resets') : null,
-    el('span', { class: 'chip' }, 'Rules ' + settings.rules_version));
+    el('span', { class: 'chip' }, 'Rules ' + settings.rules_version)].filter(Boolean));
 }
 
 async function loadList() {
@@ -209,7 +236,6 @@ async function openCase(id) {
 
 function decisionForm(c) {
   const suggested = c.total_kobo && c.balance_kobo !== null ? Math.min(c.total_kobo, c.balance_kobo) / 100 : '';
-  const reviewer = el('input', { type: 'text', value: localStorage.getItem('hanuReviewer') || '', placeholder: 'Your name' });
   const clinic = el('select', {}, el('option', { value: '' }, 'Choose a partner clinic'),
     settings.partner_clinics.map((p) => el('option', { value: p.id }, p.name)));
   if (c.clinic_is_partner) clinic.value = c.clinic_id;
@@ -218,9 +244,7 @@ function decisionForm(c) {
   const msg = el('div', { class: 'msg', role: 'alert' });
   const send = async (action) => {
     msg.textContent = '';
-    if (reviewer.value.trim().length < 2) { msg.textContent = 'Enter your name.'; return; }
-    localStorage.setItem('hanuReviewer', reviewer.value.trim());
-    const body = { action, reviewer: reviewer.value.trim(), reason: reason.value };
+    const body = { action, reason: reason.value };
     if (action === 'approve') {
       if (amount.value) body.pay_amount_naira = Number(amount.value);
       if (clinic.value) body.clinic_id = Number(clinic.value);
@@ -230,9 +254,8 @@ function decisionForm(c) {
       await openCase(c.id);
     } catch (err) { msg.textContent = err.message; }
   };
-  return el('section', { class: 'card' }, el('h3', {}, 'Your decision'),
+  return el('section', { class: 'card' }, el('h3', {}, 'Your decision, recorded as ' + settings.staff_name),
     el('div', { class: 'form' },
-      el('label', {}, 'Reviewer', reviewer),
       el('label', {}, 'Pay this clinic', clinic),
       el('label', {}, `Amount to pay (₦), balance ${naira(c.balance_kobo)}`, amount),
       el('label', { class: 'wide' }, 'Reason or note', reason),
@@ -257,7 +280,26 @@ $('upload').addEventListener('submit', async (ev) => {
   btn.disabled = false; btn.textContent = 'Send bill';
 });
 
-loadSettings().then(loadList).catch((err) => { $('main').replaceChildren(el('p', { class: 'msg' }, err.message)); });
+async function start() {
+  if (!token) return show(false);
+  try { await loadSettings(); show(true); await loadList(); } catch { if (token) $('main').replaceChildren(el('p', { class: 'msg' }, 'Could not load the queue. Reload to try again.')); }
+}
+$('signin-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const form = ev.target, btn = form.querySelector('button');
+  $('signin-msg').textContent = ''; btn.disabled = true;
+  try {
+    const out = await (await api('/api/staff/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email.value.trim(), password: form.password.value }) })).json();
+    setToken(out.token); form.reset(); await start();
+  } catch (err) { $('signin-msg').textContent = err.message; }
+  btn.disabled = false;
+});
+$('signout').addEventListener('click', async () => {
+  try { await api('/api/logout', { method: 'POST' }); } catch {}
+  setToken(null); selected = null; $('main').replaceChildren(el('p', { class: 'empty' }, 'Select a case.')); show(false);
+});
+start();
 </script>
 </body>
 </html>

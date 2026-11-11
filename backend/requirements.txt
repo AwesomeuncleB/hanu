@@ -1,4 +1,5 @@
 groq
+psycopg[binary,pool]
 fastapi
 uvicorn
 pydantic>=2

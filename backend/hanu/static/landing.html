@@ -16,14 +16,16 @@
   <div class="wrap nav-in">
     <a class="brand" href="#top" aria-label="Hanu home">hanu<span>.</span></a>
     <nav class="links" aria-label="Primary">
+      <a href="#agents">The agents</a>
       <a href="#how">How it works</a>
       <a href="#plans">Ways to save</a>
       <a href="#rules">The rules</a>
-      <a href="#agents">Agents</a>
       <a href="#faq">Questions</a>
     </nav>
-    <!-- TODO: replace href with your WhatsApp link, e.g. https://wa.me/234XXXXXXXXXX -->
-    <a class="btn btn-sm" href="#start">Start on WhatsApp</a>
+    <div class="nav-cta">
+      <a class="nav-signin" href="/member">Sign in</a>
+      <a class="btn btn-sm" href="/member#join">Create your Hanu ID</a>
+    </div>
   </div>
 </header>
 
@@ -32,21 +34,21 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow">Healthcare savings · Not insurance</p>
-        <h1>Money for care, set aside <em>before</em> you need it.</h1>
-        <p class="lede">Save for your health alone or with your group. When you visit a partner clinic, show your Hanu ID and Hanu pays the clinic directly, usually at a negotiated discount.</p>
+        <p class="eyebrow"><span class="pulse" aria-hidden="true"></span>Healthcare savings · Run by AI agents, decided by people</p>
+        <h1>Money for care, set aside <em>before</em> you need it. <span class="h1-ai">AI agents handle every bill.</span></h1>
+        <p class="lede">Save for your health alone or with your group. When you visit a partner clinic, show your Hanu ID and send the bill. AI agents read it, check the price and your balance, and Hanu pays the clinic directly.</p>
         <div class="cta-row">
-          <a class="btn" href="#start">Start on WhatsApp</a>
-          <a class="btn btn-ghost" href="#how">See how it works</a>
+          <a class="btn" href="/member#join">Create your Hanu ID</a>
+          <a class="btn btn-ghost" href="#agents">Meet the agents</a>
         </div>
         <ul class="trust">
-          <li>Your savings stay yours</li>
+          <li>Not insurance: your savings stay yours</li>
           <li>Paid to the clinic, never in cash</li>
-          <li>A human decides every denial</li>
+          <li>Agents can flag a bill, only a person can refuse one</li>
         </ul>
       </div>
 
-      <div class="hero-art" aria-label="Illustration of a Hanu ID and a WhatsApp conversation">
+      <div class="hero-art">
         <div class="idcard">
           <div class="id-top">
             <span class="id-brand">hanu<span>.</span></span>
@@ -61,43 +63,96 @@
           </div>
         </div>
 
-        <div class="chat">
-          <div class="chat-head"><span class="dot"></span>Hanu on WhatsApp</div>
-          <div class="bubble me">📎 Clinic bill.jpg</div>
-          <div class="bubble">Consultation and malaria test, <b>₦8,500</b>. That is in line with other partner clinics near you. Pay the clinic from your balance?</div>
-          <div class="bubble me">Yes</div>
-          <div class="bubble">Paid ₦8,500 to the clinic. Your balance is now <b>₦33,500</b>.</div>
+        <div class="run" aria-label="Illustration: Hanu's agents processing a clinic bill step by step">
+          <div class="run-head">
+            <span class="run-title"><span class="pulse" aria-hidden="true"></span>Agent run</span>
+            <span class="run-tabs" role="group" aria-label="Choose an example">
+              <button type="button" data-run="clean" aria-pressed="true">Clean bill</button>
+              <button type="button" data-run="flagged" aria-pressed="false">Flagged bill</button>
+            </span>
+          </div>
+          <ol class="run-steps" id="run-steps"></ol>
+          <p class="run-foot">Illustrative run with invented figures.</p>
         </div>
-        <p class="note">Illustrative example</p>
       </div>
     </div>
   </section>
 
   <section class="band">
     <div class="wrap band-in">
+      <ul class="facts" aria-label="How Hanu runs">
+        <li><b>4</b><span>AI agents, each with one job: read the bill, check the price, check the balance, remind</span></li>
+        <li><b>17</b><span>written rules applied to every bill the agents read</span></li>
+        <li><b>0</b><span>bills an AI can refuse. Only a named person can, with a written reason</span></li>
+      </ul>
       <p>Hanu is not insurance. There are no premiums and no pooled risk. You save your own money for your own care, and we make it go further.</p>
+    </div>
+  </section>
+
+  <section id="agents" class="sec sec-dark">
+    <div class="wrap">
+      <p class="eyebrow">The agents</p>
+      <h2>Four agents do the work. Rules and people decide.</h2>
+      <p class="lede">Every bill passes through a small team of AI agents, each with one job and strict limits. They read, check and flag. Written rules judge the result, and a person reviews anything that could become a refusal.</p>
+
+      <div class="agents">
+        <article class="agent reveal">
+          <div class="agent-top"><span class="glyph" aria-hidden="true">01</span><span class="tag live">Working today</span></div>
+          <h3>Reader agent</h3>
+          <p>Turns a photo of a clinic bill into line items, a total, and a confidence score for each part.</p>
+          <dl><div><dt>Can</dt><dd>Transcribe, and say when it is unsure</dd></div><div><dt>Cannot</dt><dd>Approve, pay or deny</dd></div></dl>
+        </article>
+        <article class="agent reveal">
+          <div class="agent-top"><span class="glyph" aria-hidden="true">02</span><span class="tag next">In build</span></div>
+          <h3>Price agent</h3>
+          <p>Compares each item with the agreed price and with other partner clinics.</p>
+          <dl><div><dt>Can</dt><dd>Flag an overcharge</dd></div><div><dt>Cannot</dt><dd>Change or reject a bill</dd></div></dl>
+        </article>
+        <article class="agent reveal">
+          <div class="agent-top"><span class="glyph" aria-hidden="true">03</span><span class="tag live">Working today</span></div>
+          <h3>Ledger agent</h3>
+          <p>Keeps every balance exact and checks whether a bill is covered before anything is paid.</p>
+          <dl><div><dt>Can</dt><dd>Check balances and record payments</dd></div><div><dt>Cannot</dt><dd>Move money without an approval</dd></div></dl>
+        </article>
+        <article class="agent reveal">
+          <div class="agent-top"><span class="glyph" aria-hidden="true">04</span><span class="tag next">In build</span></div>
+          <h3>Reminder agent</h3>
+          <p>Nudges for contributions and tells you before a lock ends.</p>
+          <dl><div><dt>Can</dt><dd>Send approved messages</dd></div><div><dt>Cannot</dt><dd>Touch your balance</dd></div></dl>
+        </article>
+      </div>
+
+      <div class="flow" aria-label="Decision flow">
+        <span>Bill arrives</span><i></i><span>Agents read and flag</span><i></i><span>17 written rules</span><i></i><span class="hl">Person reviews any flag</span><i></i><span>Clinic paid</span>
+      </div>
+
+      <ul class="guards">
+        <li class="reveal"><h3>No deny button</h3><p>The agents have no way to refuse a bill. A refusal needs a named person and a written reason, which the member sees.</p></li>
+        <li class="reveal"><h3>Every step is logged</h3><p>What each agent read, which rule fired, and who decided are all recorded and can be checked later.</p></li>
+        <li class="reveal"><h3>A bill is data, not an order</h3><p>If a bill contains text telling the system what to do, the agent flags it and a person looks.</p></li>
+      </ul>
     </div>
   </section>
 
   <section id="how" class="sec">
     <div class="wrap">
       <p class="eyebrow">How it works</p>
-      <h2>Three steps, all on WhatsApp.</h2>
+      <h2>Three steps, from your phone.</h2>
       <div class="steps">
         <article class="step reveal">
           <span class="n">01</span>
           <h3>Save</h3>
-          <p>Join through your cooperative or on your own. Contributions build a health balance that is locked for six months or one year.</p>
+          <p>Create your Hanu ID, through your cooperative or on your own. Contributions build a health balance that is locked for six months or one year.</p>
         </article>
         <article class="step reveal">
           <span class="n">02</span>
           <h3>Show your Hanu ID</h3>
-          <p>At a partner clinic, show your Hanu ID for a consultation or a lab test. Nothing to pay at the desk if your balance covers it.</p>
+          <p>At a partner clinic, show your Hanu ID for a consultation or a lab test, then send a photo of the bill from your phone.</p>
         </article>
         <article class="step reveal">
           <span class="n">03</span>
-          <h3>Hanu pays the clinic</h3>
-          <p>We check the bill, pay the clinic directly at the negotiated price, and send you the receipt and your new balance.</p>
+          <h3>Agents check, Hanu pays</h3>
+          <p>The agents read and check the bill, Hanu pays the clinic directly, and you see the payment and your new balance.</p>
         </article>
       </div>
     </div>
@@ -151,23 +206,6 @@
     </div>
   </section>
 
-  <section id="agents" class="sec sec-dark">
-    <div class="wrap">
-      <p class="eyebrow">AI agents</p>
-      <h2>Agents flag. Rules and people decide.</h2>
-      <p class="lede">Software does the reading, checking and reminding. It never refuses care. Decisions follow written rules, and a person reviews anything that could become a denial.</p>
-      <div class="agents">
-        <article class="agent reveal"><h3>Reads the bill</h3><p>Turns a photo of a clinic bill into line items and amounts.</p></article>
-        <article class="agent reveal"><h3>Checks the price</h3><p>Compares each item against the agreed price and other partner clinics.</p></article>
-        <article class="agent reveal"><h3>Tracks balances</h3><p>Keeps every member and group balance current, to the naira.</p></article>
-        <article class="agent reveal"><h3>Sends reminders</h3><p>Nudges for contributions and lets you know before a lock ends.</p></article>
-      </div>
-      <div class="flow" aria-label="Decision flow">
-        <span>Bill arrives</span><i></i><span>Agents read and flag</span><i></i><span>Written rules</span><i></i><span class="hl">Human review on any flag</span><i></i><span>Clinic paid</span>
-      </div>
-    </div>
-  </section>
-
   <section id="faq" class="sec">
     <div class="wrap faq-wrap">
       <div>
@@ -186,10 +224,12 @@
 
   <section id="start" class="sec cta">
     <div class="wrap cta-in">
-      <h2>Start with a message.</h2>
-      <p class="lede">Say hello on WhatsApp and we will set up your Hanu ID. Running a cooperative, a clinic or a workplace? Tell us and we will talk.</p>
-      <!-- TODO: replace href with your WhatsApp link -->
-      <a class="btn btn-light" href="#start">Start on WhatsApp</a>
+      <h2>Start with your Hanu ID.</h2>
+      <p class="lede">It takes a minute: your name, your phone number and a PIN. Running a cooperative, a clinic or a workplace? Tell us and we will talk.</p>
+      <div class="cta-row">
+        <a class="btn btn-light" href="/member#join">Create your Hanu ID</a>
+        <a class="btn btn-outline" href="/member">Sign in</a>
+      </div>
     </div>
   </section>
 
@@ -199,6 +239,7 @@
   <div class="wrap foot-in">
     <span class="brand">hanu<span>.</span></span>
     <p>Hanu is a healthcare savings and payment platform. It is not an insurance product.</p>
+    <a class="foot-link" href="/review">Team sign in</a>
   </div>
 </footer>
 
@@ -209,6 +250,73 @@
   document.querySelectorAll('.reveal').forEach((el, i) => {
     el.style.transitionDelay = (i % 4) * 70 + 'ms'; io.observe(el);
   });
+
+  // Agent run: an illustration of how a bill moves through the agents. Figures are invented.
+  const RUNS = {
+    clean: [
+      ['Member', 'Bill photo sent from HN · 4821 · 0937', 'in'],
+      ['Reader agent', 'Reading the bill', '2 items, total ₦8,500, 97% legible', 'ok'],
+      ['Price agent', 'Comparing with partner clinics', 'Within the agreed price', 'ok'],
+      ['Ledger agent', 'Checking the balance', '₦42,000 available, bill is covered', 'ok'],
+      ['Written rules', 'Running 17 checks', '17 of 17 passed, no flags', 'ok'],
+      ['Payment', 'Paying the clinic', '₦8,500 paid to the clinic', 'paid'],
+      ['Member', 'New balance ₦33,500', 'in'],
+    ],
+    flagged: [
+      ['Member', 'Bill photo sent from HN · 1107 · 5520', 'in'],
+      ['Reader agent', 'Reading the bill', 'Total ₦9,500, but only 61% legible', 'flag'],
+      ['Price agent', 'Comparing with partner clinics', 'Malaria test ₦1,000 above agreed price', 'flag'],
+      ['Ledger agent', 'Checking the balance', '₦6,000 available, ₦3,500 short', 'flag'],
+      ['Written rules', 'Running 17 checks', '3 flags. Agents cannot deny: sent to a person', 'flag'],
+      ['Reviewer', 'A person checks the photo and calls the clinic', 'Approved ₦6,000, member pays the rest', 'human'],
+      ['Payment', 'Paying the clinic', '₦6,000 paid to the clinic', 'paid'],
+    ],
+  };
+  const stepsEl = document.getElementById('run-steps');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let runId = 0;
+  const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
+  function line(step) {
+    const li = document.createElement('li');
+    const who = document.createElement('span'); who.className = 'who'; who.textContent = step[0];
+    const what = document.createElement('span'); what.className = 'what';
+    li.append(who, what);
+    return { li, what };
+  }
+  async function play(name) {
+    const mine = ++runId;
+    stepsEl.replaceChildren();
+    for (const step of RUNS[name]) {
+      const { li, what } = line(step);
+      const kind = step[step.length - 1];
+      stepsEl.append(li);
+      if (step.length === 3 || still) {
+        what.textContent = step.length === 3 ? step[1] : step[2];
+        li.className = kind + ' shown';
+        if (!still) await wait(650);
+      } else {
+        what.textContent = step[1] + '…';
+        li.className = 'working shown';
+        await wait(kind === 'human' ? 1700 : 1050);
+        if (mine !== runId) return;
+        what.textContent = step[2];
+        li.className = kind + ' shown';
+        await wait(450);
+      }
+      if (mine !== runId) return;
+    }
+    if (still) return;
+    await wait(5200);
+    if (mine === runId) play(name);
+  }
+  for (const btn of document.querySelectorAll('[data-run]')) {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-run]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      play(btn.dataset.run);
+    });
+  }
+  play('clean');
 </script>
 </body>
 </html>

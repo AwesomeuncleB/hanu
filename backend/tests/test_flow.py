@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -13,6 +14,7 @@ from hanu import db, extract, main  # noqa: E402
 
 AMINA = "HN-4821-0937"   # balance 42,000
 CHINEDU = "HN-1107-5520"  # balance 6,000
+STAFF_EMAIL, STAFF_PASSWORD = "bola@hanu.test", "test-only-password"
 
 
 def bill(**over):
@@ -46,12 +48,27 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setenv("HANU_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("HANU_SEED_DEMO", "1")
     monkeypatch.setenv("HANU_SHADOW_MODE", "0")
-    monkeypatch.delenv("HANU_REVIEW_TOKEN", raising=False)
-    monkeypatch.setattr(db, "PIN_ITERATIONS", 1000)
+    monkeypatch.setenv("HANU_ADMIN_EMAIL", STAFF_EMAIL)
+    monkeypatch.setenv("HANU_ADMIN_PASSWORD", STAFF_PASSWORD)
+    monkeypatch.setenv("HANU_ADMIN_NAME", "Bola")
+    monkeypatch.setattr(db, "HASH_ITERATIONS", 1000)
+    # Set HANU_TEST_DATABASE_URL to run the same tests on Postgres. Every table in that
+    # database is dropped first, so point it at a throwaway database only.
+    test_db = os.environ.get("HANU_TEST_DATABASE_URL")
+    if test_db:
+        monkeypatch.setenv("DATABASE_URL", test_db)
+        with db.tx() as conn:
+            conn.execute("DROP TABLE IF EXISTS audit_log, ledger, cases, bill_images, clinics, "
+                         "sessions, staff, members CASCADE")
+    else:
+        monkeypatch.delenv("DATABASE_URL", raising=False)
     db.init()
     state = {"result": extract.ExtractionResult(bill(), "fake-model")}
     monkeypatch.setattr(extract, "extract_bill", lambda _bytes, _type: state["result"])
     client = TestClient(main.app)
+    client.anonymous = TestClient(main.app)
+    signed_in = client.post("/api/staff/login", json={"email": STAFF_EMAIL, "password": STAFF_PASSWORD})
+    client.headers["Authorization"] = "Bearer " + signed_in.json()["token"]
 
     def submit(sender=AMINA, seed=0, **over):
         if over:
@@ -63,7 +80,7 @@ def app(tmp_path, monkeypatch):
     client.submit = submit
     client.state = state
     client.case = lambda cid: client.get(f"/api/cases/{cid}").json()
-    client.decide = lambda cid, **body: client.post(f"/api/cases/{cid}/decision", json={"reviewer": "Bola", **body})
+    client.decide = lambda cid, **body: client.post(f"/api/cases/{cid}/decision", json=body)
     return client
 
 
@@ -159,7 +176,7 @@ def test_only_a_person_with_a_reason_can_deny(app):
     res = app.decide(cid, action="deny", reason="Total does not match the items; clinic to reissue.")
     assert res.status_code == 200 and res.json()["status"] == "denied"
     assert res.json()["balance_kobo"] == 4200000
-    assert res.json()["decided_by"] == "Bola"
+    assert res.json()["decided_by"] == "reviewer:Bola"
 
 
 def test_flagged_bill_needs_a_note_to_approve(app):
@@ -188,10 +205,27 @@ def test_rejects_files_that_are_not_images(app):
     assert res.status_code == 422
 
 
-def test_queue_lists_and_token(app, monkeypatch):
-    app.submit(total_naira=9500)
+def test_queue_lists_and_bill_photo(app):
+    cid = app.submit(total_naira=9500)["case_id"]
     assert len(app.get("/api/cases?status=needs_review").json()) == 1
     assert app.get("/api/cases?status=decided").json() == []
-    monkeypatch.setenv("HANU_REVIEW_TOKEN", "s3cret")
+    image = app.get(f"/api/cases/{cid}/image")
+    assert image.status_code == 200 and image.headers["content-type"] == "image/png"
+    assert image.content == photo()
+
+
+def test_review_queue_needs_a_staff_sign_in(app):
+    anon = app.anonymous
+    cid = app.submit(total_naira=9500)["case_id"]
+    for path in ("/api/cases", f"/api/cases/{cid}", f"/api/cases/{cid}/image", "/api/settings"):
+        assert anon.get(path).status_code == 401
+    assert anon.post(f"/api/cases/{cid}/decision", json={"action": "deny", "reason": "no reason"}).status_code == 401
+    assert anon.post("/api/staff/login", json={"email": STAFF_EMAIL, "password": "wrong"}).status_code == 401
+    assert app.get("/api/settings").json()["staff_name"] == "Bola"
+    app.post("/api/logout")
     assert app.get("/api/cases").status_code == 401
-    assert app.get("/api/cases", headers={"X-Review-Token": "s3cret"}).status_code == 200
+
+
+def test_a_member_session_cannot_open_the_review_queue(app):
+    token = app.anonymous.post("/api/member/login", json={"hanu_id": AMINA, "pin": db.DEMO_PIN}).json()["token"]
+    assert app.anonymous.get("/api/cases", headers={"Authorization": "Bearer " + token}).status_code == 401
