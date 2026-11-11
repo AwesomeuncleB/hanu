@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hanu — Review queue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ivory:#f6f2e9; --paper:#fbf9f4; --ink:#10261f; --forest:#0d2f25; --muted:#5d6b64;
+  --line:#e2dccd; --brass:#b4873a; --warn:#8a5a12; --warn-bg:#f6ead0; --bad:#8c2f24; --bad-bg:#f5dfda;
+  --ok:#1f6b4a; --ok-bg:#dcebe1; --serif:"Fraunces",Georgia,serif; --sans:"Inter",system-ui,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ivory); color:var(--ink); font:400 15px/1.5 var(--sans); -webkit-font-smoothing:antialiased; }
+h1,h2,h3 { font-family:var(--serif); font-weight:500; letter-spacing:-.01em; margin:0; }
+button,input,select,textarea { font:inherit; color:inherit; }
+.top { display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; padding:14px 24px; border-bottom:1px solid var(--line); background:var(--paper); }
+.brand { font-family:var(--serif); font-size:1.45rem; font-weight:600; }
+.brand span { color:var(--brass); }
+.top h1 { font-size:1.05rem; font-family:var(--sans); font-weight:500; color:var(--muted); }
+.chips { margin-left:auto; display:flex; flex-wrap:wrap; gap:8px; }
+.chip { font-size:.76rem; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:var(--ivory); color:var(--muted); }
+.chip.warn { background:var(--warn-bg); color:var(--warn); border-color:transparent; }
+.layout { display:grid; grid-template-columns:340px 1fr; min-height:calc(100vh - 62px); }
+.side { border-right:1px solid var(--line); background:var(--paper); display:flex; flex-direction:column; min-width:0; }
+.tabs { display:flex; border-bottom:1px solid var(--line); }
+.tabs button { flex:1; padding:13px 8px; background:none; border:0; border-bottom:2px solid transparent; cursor:pointer; color:var(--muted); font-weight:500; }
+.tabs button[aria-selected=true] { color:var(--ink); border-bottom-color:var(--forest); }
+.list { list-style:none; margin:0; padding:0; overflow:auto; flex:1; }
+.list li button { display:block; width:100%; text-align:left; padding:14px 18px; background:none; border:0; border-bottom:1px solid var(--line); cursor:pointer; }
+.list li button:hover, .list li button.sel { background:var(--ivory); }
+.list .row1 { display:flex; justify-content:space-between; gap:10px; font-weight:500; }
+.list .row2 { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:.84rem; margin-top:2px; }
+.empty { padding:28px 18px; color:var(--muted); }
+.upload { border-top:1px solid var(--line); padding:16px 18px; display:grid; gap:8px; }
+.upload h3 { font-family:var(--sans); font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+input[type=text],input[type=number],select,textarea { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+textarea { min-height:74px; resize:vertical; }
+.btn { padding:10px 18px; border-radius:999px; border:1px solid var(--forest); background:var(--forest); color:var(--paper); font-weight:500; cursor:pointer; }
+.btn:disabled { opacity:.5; cursor:default; }
+.btn.ghost { background:transparent; color:var(--ink); border-color:var(--line); }
+.btn.deny { background:transparent; color:var(--bad); border-color:var(--bad); }
+.main { padding:28px 32px 60px; min-width:0; }
+.head { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 16px; margin-bottom:6px; }
+.head h2 { font-size:1.7rem; }
+.sub { color:var(--muted); margin-bottom:22px; }
+.pill { font-size:.76rem; font-weight:600; padding:3px 10px; border-radius:999px; }
+.pill.needs_review { background:var(--warn-bg); color:var(--warn); }
+.pill.approved { background:var(--ok-bg); color:var(--ok); }
+.pill.denied { background:var(--bad-bg); color:var(--bad); }
+.card { background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-bottom:18px; }
+.card h3 { font-family:var(--sans); font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+.flags { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.flags li { background:var(--warn-bg); color:#5c3c0b; padding:9px 13px; border-radius:9px; }
+.clean { color:var(--ok); font-weight:500; }
+.cols { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; }
+.bill img { width:100%; border-radius:8px; border:1px solid var(--line); background:#fff; }
+table { width:100%; border-collapse:collapse; }
+td,th { text-align:left; padding:7px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+th { font-weight:500; color:var(--muted); width:38%; }
+td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.conf { color:var(--muted); font-size:.8rem; }
+.conf.low { color:var(--bad); font-weight:600; }
+.form { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+.form label { display:grid; gap:5px; font-size:.84rem; color:var(--muted); }
+.form .wide { grid-column:1 / -1; }
+.actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.msg { color:var(--bad); font-size:.9rem; }
+.audit { font-size:.86rem; }
+.audit li { margin-bottom:6px; }
+.audit code { color:var(--muted); font-size:.8rem; word-break:break-word; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns:1fr; }
+  .side { border-right:0; border-bottom:1px solid var(--line); }
+  .list { max-height:40vh; }
+  .main { padding:22px 16px 48px; }
+  .cols, .form { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="brand">hanu<span>.</span></span>
+  <h1>Bill review queue</h1>
+  <div class="chips" id="chips"></div>
+</header>
+<div class="layout">
+  <aside class="side">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-needs_review" aria-selected="true">Needs review</button>
+      <button role="tab" id="tab-decided" aria-selected="false">Decided</button>
+    </div>
+    <ul class="list" id="list"></ul>
+    <form class="upload" id="upload">
+      <h3>Submit a test bill</h3>
+      <input type="text" name="hanu_id" placeholder="Hanu ID, e.g. HN-4821-0937" required>
+      <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+      <button class="btn ghost" type="submit">Send bill</button>
+      <div class="msg" id="upload-msg"></div>
+    </form>
+  </aside>
+  <main class="main" id="main"><p class="empty">Select a case.</p></main>
+</div>
+
+<script>
+// Everything read off a bill is untrusted, so it only ever reaches the page as text
+// (textContent), never as HTML.
+const $ = (id) => document.getElementById(id);
+function el(tag, attrs = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v; else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined) node.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined) node.append(kid);
+  return node;
+}
+const naira = (kobo) => kobo === null || kobo === undefined ? '—'
+  : '₦' + (kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: kobo % 100 ? 2 : 0 });
+const when = (iso) => iso ? new Date(iso).toLocaleString() : '';
+
+async function api(path, opts = {}, retry = true) {
+  const headers = { ...(opts.headers || {}) };
+  const token = sessionStorage.getItem('hanuReviewToken');
+  if (token) headers['X-Review-Token'] = token;
+  const res = await fetch(path, { ...opts, headers });
+  if (res.status === 401 && retry) {
+    const entered = prompt('Review token');
+    if (entered) { sessionStorage.setItem('hanuReviewToken', entered); return api(path, opts, false); }
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const body = await res.json(); detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail); } catch {}
+    throw new Error(detail);
+  }
+  return res;
+}
+const getJSON = async (path) => (await api(path)).json();
+
+let tab = 'needs_review', selected = null, settings = { partner_clinics: [] };
+
+async function loadSettings() {
+  settings = await getJSON('/api/settings');
+  $('chips').replaceChildren(
+    el('span', { class: 'chip' + (settings.shadow_mode ? '' : ' warn') },
+      settings.shadow_mode ? 'Shadow mode: every bill is reviewed' : 'Rules may approve clean bills'),
+    settings.extractor === 'mock' ? el('span', { class: 'chip warn' }, 'Mock bill reader') : null,
+    el('span', { class: 'chip' }, 'Rules ' + settings.rules_version));
+}
+
+async function loadList() {
+  const cases = await getJSON('/api/cases?status=' + tab);
+  for (const t of ['needs_review', 'decided']) $('tab-' + t).setAttribute('aria-selected', String(t === tab));
+  if (!cases.length) {
+    $('list').replaceChildren(el('li', { class: 'empty' }, tab === 'needs_review' ? 'Nothing waiting for review.' : 'No decided cases yet.'));
+    return;
+  }
+  $('list').replaceChildren(...cases.map((c) => el('li', {},
+    el('button', { class: c.id === selected ? 'sel' : '', onclick: () => openCase(c.id) },
+      el('div', { class: 'row1' }, el('span', {}, c.member_name || 'Unknown member'), el('span', {}, naira(c.paid_kobo ?? c.total_kobo))),
+      el('div', { class: 'row2' },
+        el('span', {}, `Case ${c.id} · ${c.clinic_name || 'clinic not matched'}`),
+        el('span', {}, c.status === 'needs_review' ? (c.flag_count ? c.flag_count + (c.flag_count === 1 ? ' flag' : ' flags') : 'no flags') : c.status))))));
+}
+
+async function openCase(id) {
+  selected = id;
+  const c = await getJSON('/api/cases/' + id);
+  const x = c.extraction;
+  const main = $('main');
+  const img = el('img', { alt: 'Photo of the submitted bill' });
+  api(`/api/cases/${id}/image`).then((r) => r.blob()).then((b) => { img.src = URL.createObjectURL(b); }).catch(() => { img.alt = 'Bill image could not be loaded'; });
+
+  const minConf = 0.85;
+  const conf = (key) => x ? el('span', { class: 'conf' + (x.confidence[key] < minConf ? ' low' : '') }, ` ${Math.round(x.confidence[key] * 100)}%`) : null;
+  const read = x ? el('table', {},
+    el('tr', {}, el('th', {}, 'Clinic'), el('td', {}, x.clinic_name || '—', conf('clinic_name'))),
+    el('tr', {}, el('th', {}, 'Date'), el('td', {}, x.bill_date || '—', conf('bill_date'))),
+    el('tr', {}, el('th', {}, 'Patient'), el('td', {}, x.patient_name || '—')),
+    el('tr', {}, el('th', {}, 'Hanu ID on bill'), el('td', {}, x.hanu_id || '—')),
+    ...x.line_items.map((i) => el('tr', {}, el('th', {}, i.description, el('div', { class: 'conf' }, i.category.replace('_', ' '))), el('td', { class: 'num' }, naira(Math.round(i.amount_naira * 100))))),
+    el('tr', {}, el('th', {}, 'Stated total', conf('total')), el('td', { class: 'num' }, el('strong', {}, naira(c.total_kobo)))),
+    x.notes ? el('tr', {}, el('th', {}, 'Reader notes'), el('td', {}, x.notes)) : null)
+    : el('p', {}, 'The bill reader produced no result. Read the photo yourself.');
+
+  const flags = c.flags.length
+    ? el('ul', { class: 'flags' }, c.flags.map((f) => el('li', {}, f.message)))
+    : el('p', { class: 'clean' }, 'No flags. The rules recommend approving this bill.');
+
+  main.replaceChildren(
+    el('div', { class: 'head' }, el('h2', {}, `Case ${c.id}`), el('span', { class: 'pill ' + c.status }, c.status.replace('_', ' '))),
+    el('p', { class: 'sub' }, `${c.member_name || 'Unknown member'} · sent as ${c.hanu_id_submitted} · balance ${naira(c.balance_kobo)} · received ${when(c.created_at)}`),
+    el('section', { class: 'card' }, el('h3', {}, `Rules ${c.rules_version}`), flags),
+    el('div', { class: 'cols' },
+      el('section', { class: 'card bill' }, el('h3', {}, 'Bill photo'), img),
+      el('section', { class: 'card' }, el('h3', {}, `Read by ${c.extractor_model}`), read)),
+    c.status === 'needs_review' ? decisionForm(c) : el('section', { class: 'card' }, el('h3', {}, 'Decision'),
+      el('p', {}, `${c.status === 'approved' ? 'Approved, ' + naira(c.paid_kobo) + ' to ' + (c.clinic_name || 'clinic') : 'Denied'} by ${c.decided_by} on ${when(c.decided_at)}.`),
+      c.decision_reason ? el('p', {}, 'Reason: ' + c.decision_reason) : null),
+    el('section', { class: 'card' }, el('h3', {}, 'Audit trail'),
+      el('ul', { class: 'audit' }, c.audit.map((a) => el('li', {}, `${when(a.at)} · ${a.actor} · ${a.event.replace('_', ' ')}`,
+        el('details', {}, el('summary', {}, 'detail'), el('code', {}, JSON.stringify(a.detail))))))));
+  loadList();
+}
+
+function decisionForm(c) {
+  const suggested = c.total_kobo && c.balance_kobo !== null ? Math.min(c.total_kobo, c.balance_kobo) / 100 : '';
+  const reviewer = el('input', { type: 'text', value: localStorage.getItem('hanuReviewer') || '', placeholder: 'Your name' });
+  const clinic = el('select', {}, el('option', { value: '' }, 'Choose a partner clinic'),
+    settings.partner_clinics.map((p) => el('option', { value: p.id }, p.name)));
+  if (c.clinic_is_partner) clinic.value = c.clinic_id;
+  const amount = el('input', { type: 'number', min: '0', step: '0.01', value: suggested });
+  const reason = el('textarea', { placeholder: 'Required to deny, and to approve a flagged bill or a changed amount. A denial reason is given to the member.' });
+  const msg = el('div', { class: 'msg', role: 'alert' });
+  const send = async (action) => {
+    msg.textContent = '';
+    if (reviewer.value.trim().length < 2) { msg.textContent = 'Enter your name.'; return; }
+    localStorage.setItem('hanuReviewer', reviewer.value.trim());
+    const body = { action, reviewer: reviewer.value.trim(), reason: reason.value };
+    if (action === 'approve') {
+      if (amount.value) body.pay_amount_naira = Number(amount.value);
+      if (clinic.value) body.clinic_id = Number(clinic.value);
+    }
+    try {
+      await api(`/api/cases/${c.id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await openCase(c.id);
+    } catch (err) { msg.textContent = err.message; }
+  };
+  return el('section', { class: 'card' }, el('h3', {}, 'Your decision'),
+    el('div', { class: 'form' },
+      el('label', {}, 'Reviewer', reviewer),
+      el('label', {}, 'Pay this clinic', clinic),
+      el('label', {}, `Amount to pay (₦), balance ${naira(c.balance_kobo)}`, amount),
+      el('label', { class: 'wide' }, 'Reason or note', reason),
+      el('div', { class: 'actions wide' },
+        el('button', { class: 'btn', type: 'button', onclick: () => send('approve') }, 'Approve and pay clinic'),
+        el('button', { class: 'btn deny', type: 'button', onclick: () => send('deny') }, 'Deny'),
+        msg)));
+}
+
+$('tab-needs_review').addEventListener('click', () => { tab = 'needs_review'; loadList(); });
+$('tab-decided').addEventListener('click', () => { tab = 'decided'; loadList(); });
+$('upload').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const form = ev.target, btn = form.querySelector('button'), msg = $('upload-msg');
+  msg.textContent = ''; btn.disabled = true; btn.textContent = 'Reading bill…';
+  try {
+    const out = await (await api('/api/bills', { method: 'POST', body: new FormData(form) })).json();
+    form.reset();
+    tab = out.status === 'needs_review' ? 'needs_review' : 'decided';
+    await openCase(out.case_id);
+  } catch (err) { msg.textContent = err.message; }
+  btn.disabled = false; btn.textContent = 'Send bill';
+});
+
+loadSettings().then(loadList).catch((err) => { $('main').replaceChildren(el('p', { class: 'msg' }, err.message)); });
+</script>
+</body>
+</html>
