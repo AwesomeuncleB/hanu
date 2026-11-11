@@ -1,0 +1,20 @@
+[project]
+name = "hanu"
+version = "0.1.0"
+description = "Healthcare savings and payment platform: bill reader, rules and review queue."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "groq",
+    "pillow",
+    "pydantic>=2",
+    "python-multipart",
+    "uvicorn",
+]
+
+# Where Vercel finds the FastAPI app.
+[tool.vercel]
+entrypoint = "backend.hanu.main:app"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]

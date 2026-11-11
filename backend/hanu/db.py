@@ -2,8 +2,11 @@
 
 Money is stored as integer kobo. A member's balance is the sum of their ledger rows.
 """
+import hashlib
+import hmac
 import json
 import re
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -63,9 +66,24 @@ CREATE TABLE IF NOT EXISTS audit_log (
     detail_json TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS member_sessions (
+    token_hash TEXT PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES members(id),
+    expires_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS cases_status ON cases(status, created_at);
 CREATE INDEX IF NOT EXISTS ledger_member ON ledger(member_id);
 """
+
+# Columns added to members after the first version; init() adds any that are missing.
+MEMBER_COLUMNS = {
+    "pin_hash": "TEXT",
+    "failed_logins": "INTEGER NOT NULL DEFAULT 0",
+    "locked_until": "TEXT",
+}
+
+# PIN for the invented demo members only (see seed_demo). Real members get their own.
+DEMO_PIN = "4821"
 
 
 def now() -> str:
@@ -102,6 +120,10 @@ def tx():
 def init() -> None:
     conn = connect()
     conn.executescript(SCHEMA)
+    have = {row["name"] for row in conn.execute("PRAGMA table_info(members)")}
+    for column, kind in MEMBER_COLUMNS.items():
+        if column not in have:
+            conn.execute(f"ALTER TABLE members ADD COLUMN {column} {kind}")
     conn.close()
     if config.seed_demo():
         seed_demo()
@@ -121,9 +143,31 @@ def audit(conn, case_id, actor: str, event: str, detail: dict) -> None:
     )
 
 
-def add_member(conn, hanu_id: str, name: str, contribution_naira: int = 0, lock_until=None) -> int:
+PIN_ITERATIONS = 200_000  # the tests lower this so they run quickly
+
+
+def hash_pin(pin: str, salt: str | None = None, iterations: int | None = None) -> str:
+    """Stored as "iterations$salt$digest". A short PIN cannot be made strong by hashing;
+    the login lockout is what protects it."""
+    salt = salt or secrets.token_hex(16)
+    iterations = iterations or PIN_ITERATIONS
+    digest = hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), iterations).hex()
+    return f"{iterations}${salt}${digest}"
+
+
+def check_pin(stored: str | None, pin: str) -> bool:
+    try:
+        iterations, salt, _digest = stored.split("$")
+        return hmac.compare_digest(stored, hash_pin(pin, salt, int(iterations)))
+    except (AttributeError, ValueError):
+        return False  # no PIN set, or a hash in an unknown format
+
+
+def add_member(conn, hanu_id: str, name: str, contribution_naira: int = 0, lock_until=None,
+               pin: str | None = None) -> int:
     cur = conn.execute(
-        "INSERT INTO members (hanu_id, name, lock_until) VALUES (?,?,?)", (hanu_id, name, lock_until)
+        "INSERT INTO members (hanu_id, name, lock_until, pin_hash) VALUES (?,?,?,?)",
+        (hanu_id, name, lock_until, hash_pin(pin) if pin else None),
     )
     if contribution_naira:
         conn.execute(
@@ -142,12 +186,18 @@ def add_clinic(conn, name: str, is_partner: bool = True) -> int:
 
 
 def seed_demo() -> None:
-    """Invented members and clinics for local testing. Does nothing if any member exists."""
+    """Invented members and clinics for local testing. Adds nothing if any member exists."""
+    demo_ids = ("HN-4821-0937", "HN-1107-5520")
     with tx() as conn:
         if conn.execute("SELECT 1 FROM members LIMIT 1").fetchone():
+            # A demo database made before PINs existed: give the demo members theirs.
+            conn.execute(
+                "UPDATE members SET pin_hash = ? WHERE hanu_id IN (?, ?) AND "
+                "(pin_hash IS NULL OR LENGTH(pin_hash) - LENGTH(REPLACE(pin_hash, '$', '')) != 2)",
+                (hash_pin(DEMO_PIN), *demo_ids))
             return
-        add_member(conn, "HN-4821-0937", "Amina Yusuf", 42000, "2027-05-31")
-        add_member(conn, "HN-1107-5520", "Chinedu Okafor", 6000, "2027-02-28")
+        add_member(conn, demo_ids[0], "Amina Yusuf", 42000, "2027-05-31", DEMO_PIN)
+        add_member(conn, demo_ids[1], "Chinedu Okafor", 6000, "2027-02-28", DEMO_PIN)
         add_clinic(conn, "Sabon Gari Family Clinic")
         add_clinic(conn, "Unity Diagnostics")
         add_clinic(conn, "Riverside Medical Centre", is_partner=False)

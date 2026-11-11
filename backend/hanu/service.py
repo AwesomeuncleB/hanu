@@ -7,13 +7,17 @@ code, and everything is written to the audit log.
 import hashlib
 import io
 import json
-from datetime import date
+import secrets
+from datetime import date, datetime, timedelta, timezone
 
 from PIL import Image
 
 from . import config, db, extract, rules
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_FAILED_LOGINS = 5
+LOCKOUT_MINUTES = 15
+SESSION_DAYS = 7
 MEDIA_TYPES = {"JPEG": ("image/jpeg", "jpg"), "PNG": ("image/png", "png"), "WEBP": ("image/webp", "webp")}
 
 
@@ -37,10 +41,7 @@ def submit_bill(hanu_id: str, image_bytes: bytes) -> dict:
 
     conn = db.connect()
     try:
-        member = conn.execute(
-            "SELECT * FROM members WHERE REPLACE(hanu_id, '-', '') = ?",
-            (db.name_key(hanu_id).upper(),),
-        ).fetchone()
+        member = _find_member(conn, hanu_id)
         if member:
             # The same photo sent twice (a WhatsApp retry, say) is the same case.
             again = conn.execute(
@@ -245,3 +246,101 @@ def _check_image(data: bytes) -> tuple[str, str]:
     if fmt not in MEDIA_TYPES:
         raise Problem(422, "Send the bill as a JPEG, PNG or WebP photo.")
     return MEDIA_TYPES[fmt]
+
+
+# --- Members -----------------------------------------------------------------------
+
+def _find_member(conn, hanu_id: str):
+    return conn.execute(
+        "SELECT * FROM members WHERE REPLACE(hanu_id, '-', '') = ?",
+        (db.name_key(hanu_id).upper(),),
+    ).fetchone()
+
+
+def member_login(hanu_id: str, pin: str) -> dict:
+    """Check a Hanu ID and PIN and start a session. Five wrong PINs lock the ID for a while.
+
+    An unknown ID and a wrong PIN get the same answer, so the page cannot be used to
+    find out which Hanu IDs exist.
+    """
+    now = datetime.now(timezone.utc)
+    failure = Problem(401, "That Hanu ID and PIN do not match.")
+    with db.tx() as conn:
+        member = _find_member(conn, hanu_id)
+        if member is None:
+            outcome = failure
+        elif member["locked_until"] and member["locked_until"] > now.isoformat(timespec="seconds"):
+            outcome = Problem(429, f"Too many wrong PINs. Try again in {LOCKOUT_MINUTES} minutes "
+                                   "or contact the Hanu team.")
+        elif db.check_pin(member["pin_hash"], pin):
+            token = secrets.token_urlsafe(32)
+            conn.execute("UPDATE members SET failed_logins = 0, locked_until = NULL WHERE id = ?",
+                         (member["id"],))
+            conn.execute(
+                "INSERT INTO member_sessions (token_hash, member_id, expires_at) VALUES (?,?,?)",
+                (_token_hash(token), member["id"],
+                 (now + timedelta(days=SESSION_DAYS)).isoformat(timespec="seconds")))
+            outcome = {"token": token, "name": member["name"]}
+        else:
+            failed = member["failed_logins"] + 1
+            locked = None
+            if failed >= MAX_FAILED_LOGINS:
+                failed = 0
+                locked = (now + timedelta(minutes=LOCKOUT_MINUTES)).isoformat(timespec="seconds")
+                db.audit(conn, None, f"member:{member['hanu_id']}", "login_locked", {})
+            conn.execute("UPDATE members SET failed_logins = ?, locked_until = ? WHERE id = ?",
+                         (failed, locked, member["id"]))
+            outcome = failure
+    # Raised only after the transaction commits, so the failed attempt is recorded.
+    if isinstance(outcome, Problem):
+        raise outcome
+    return outcome
+
+
+def member_from_token(token: str | None):
+    if not token:
+        raise Problem(401, "Please sign in.")
+    conn = db.connect()
+    try:
+        member = conn.execute(
+            "SELECT m.* FROM member_sessions s JOIN members m ON m.id = s.member_id "
+            "WHERE s.token_hash = ? AND s.expires_at > ?", (_token_hash(token), db.now())).fetchone()
+    finally:
+        conn.close()
+    if member is None:
+        raise Problem(401, "Please sign in again.")
+    return member
+
+
+def member_logout(token: str | None) -> None:
+    if token:
+        with db.tx() as conn:
+            conn.execute("DELETE FROM member_sessions WHERE token_hash = ?", (_token_hash(token),))
+
+
+def member_home(member) -> dict:
+    """What a member sees: their balance and their bills. No flags, no reader output."""
+    conn = db.connect()
+    try:
+        bills = []
+        for row in conn.execute(
+                "SELECT c.id, c.status, c.total_kobo, c.paid_kobo, c.created_at, c.decision_reason, "
+                "cl.name AS clinic_name FROM cases c LEFT JOIN clinics cl ON cl.id = c.clinic_id "
+                "WHERE c.member_id = ? ORDER BY c.id DESC LIMIT 50", (member["id"],)):
+            bill = dict(row)
+            if bill["status"] != "denied":
+                bill["decision_reason"] = None  # reviewer notes on approvals are internal
+            bills.append(bill)
+        return {
+            "name": member["name"],
+            "hanu_id": member["hanu_id"],
+            "lock_until": member["lock_until"],
+            "balance_kobo": db.balance_kobo(conn, member["id"]),
+            "bills": bills,
+        }
+    finally:
+        conn.close()
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()

@@ -148,6 +148,7 @@ async function loadSettings() {
     el('span', { class: 'chip' + (settings.shadow_mode ? '' : ' warn') },
       settings.shadow_mode ? 'Shadow mode: every bill is reviewed' : 'Rules may approve clean bills'),
     settings.extractor === 'mock' ? el('span', { class: 'chip warn' }, 'Mock bill reader') : null,
+    settings.storage_is_temporary ? el('span', { class: 'chip warn' }, 'Temporary storage: data resets') : null,
     el('span', { class: 'chip' }, 'Rules ' + settings.rules_version));
 }
 

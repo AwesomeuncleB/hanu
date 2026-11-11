@@ -33,6 +33,21 @@ def reviewer_only(x_review_token: Optional[str] = Header(None)):
         raise HTTPException(401, "Review token required.")
 
 
+def bearer(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return None
+
+
+def signed_in_member(token: Optional[str] = Depends(bearer)):
+    return service.member_from_token(token)
+
+
+class Login(BaseModel):
+    hanu_id: str = Field(min_length=4, max_length=40)
+    pin: str = Field(min_length=4, max_length=12)
+
+
 class Decision(BaseModel):
     action: Literal["approve", "deny"]
     reviewer: str = Field(min_length=2, max_length=80)
@@ -42,6 +57,15 @@ class Decision(BaseModel):
 
 
 @app.get("/")
+def landing_page():
+    return FileResponse(STATIC / "landing.html")
+
+
+@app.get("/styles.css")
+def landing_styles():
+    return FileResponse(STATIC / "styles.css")
+
+
 @app.get("/review")
 def review_page():
     return FileResponse(STATIC / "review.html")
@@ -57,6 +81,7 @@ def settings():
         conn.close()
     return {
         "shadow_mode": config.shadow_mode(),
+        "storage_is_temporary": config.storage_is_temporary(),
         "extractor": config.extractor(),
         "rules_version": rules.RULES_VERSION,
         "auto_approve_cap_kobo": config.auto_approve_cap_kobo(),
@@ -103,3 +128,32 @@ def case_image(case_id: int):
 def decide(case_id: int, body: Decision):
     return service.decide(case_id, body.action, body.reviewer, body.reason,
                           body.pay_amount_naira, body.clinic_id)
+
+
+# --- Member page -------------------------------------------------------------------
+
+@app.get("/member")
+def member_page():
+    return FileResponse(STATIC / "member.html")
+
+
+@app.post("/api/member/login")
+def member_login(body: Login):
+    return service.member_login(body.hanu_id, body.pin)
+
+
+@app.post("/api/member/logout")
+def member_logout(token: Optional[str] = Depends(bearer)):
+    service.member_logout(token)
+    return {"ok": True}
+
+
+@app.get("/api/member/me")
+def member_home(member=Depends(signed_in_member)):
+    return service.member_home(member)
+
+
+@app.post("/api/member/bills")
+def member_bill(image: UploadFile = File(...), member=Depends(signed_in_member)):
+    receipt = service.submit_bill(member["hanu_id"], image.file.read(service.MAX_IMAGE_BYTES + 1))
+    return {**receipt, **service.member_home(member)}

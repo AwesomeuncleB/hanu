@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d2f25">
+<title>Hanu — My health savings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ivory:#f6f2e9; --paper:#fbf9f4; --ink:#10261f; --forest:#0d2f25; --muted:#5d6b64; --line:#e2dccd;
+  --brass:#b4873a; --brass-soft:#e6d3a8; --warn:#8a5a12; --warn-bg:#f6ead0; --bad:#8c2f24; --bad-bg:#f5dfda;
+  --ok:#1f6b4a; --ok-bg:#dcebe1; --serif:"Fraunces",Georgia,serif; --sans:"Inter",system-ui,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ivory); color:var(--ink); font:400 16px/1.5 var(--sans); -webkit-font-smoothing:antialiased; }
+.wrap { width:min(460px, 100% - 32px); margin:0 auto; padding:20px 0 48px; }
+h1,h2 { font-family:var(--serif); font-weight:500; letter-spacing:-.02em; margin:0; }
+h1 { font-size:2rem; line-height:1.1; }
+h2 { font-size:1.2rem; margin:30px 0 12px; }
+p { margin:0; }
+.top { display:flex; justify-content:space-between; align-items:center; margin-bottom:26px; }
+.brand { font-family:var(--serif); font-size:1.6rem; font-weight:600; }
+.brand span { color:var(--brass); }
+.link { background:none; border:0; color:var(--muted); font:inherit; font-size:.9rem; text-decoration:underline; cursor:pointer; padding:8px 0; }
+.muted { color:var(--muted); }
+label { display:grid; gap:6px; font-size:.9rem; color:var(--muted); margin-top:16px; }
+input[type=text], input[type=password] { font:inherit; font-size:1.05rem; color:var(--ink); padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; width:100%; }
+.btn { display:flex; align-items:center; justify-content:center; width:100%; min-height:54px; margin-top:20px; padding:14px 20px; border-radius:999px; border:1px solid var(--forest); background:var(--forest); color:var(--paper); font:500 1.02rem var(--sans); cursor:pointer; }
+.btn[aria-disabled=true], .btn:disabled { opacity:.55; cursor:default; }
+.msg { margin-top:14px; padding:12px 14px; border-radius:12px; font-size:.95rem; }
+.msg.bad { background:var(--bad-bg); color:var(--bad); }
+.msg.ok { background:var(--ok-bg); color:var(--ok); }
+.msg.wait { background:var(--warn-bg); color:#5c3c0b; }
+.card {
+  border-radius:20px; padding:22px 24px; color:#f3ecd9;
+  background: radial-gradient(120% 90% at 100% 0%, rgba(180,135,58,.38), transparent 55%), linear-gradient(145deg,#17493a 0%,#0d2f25 55%,#081e18 100%);
+  box-shadow:0 26px 44px -28px rgba(8,30,24,.7), inset 0 0 0 1px rgba(230,211,168,.22);
+}
+.card small { display:block; font-size:.68rem; letter-spacing:.16em; text-transform:uppercase; opacity:.7; }
+.card .bal { font-family:var(--serif); font-size:2.5rem; line-height:1.15; margin:2px 0 16px; font-variant-numeric:tabular-nums; }
+.card .row { display:flex; justify-content:space-between; gap:16px; padding-top:14px; border-top:1px solid rgba(230,211,168,.2); font-size:.92rem; }
+.card .row b { font-weight:500; font-variant-numeric:tabular-nums; }
+input[type=file] { position:absolute; width:1px; height:1px; opacity:0; }
+input[type=file]:focus-visible + .btn { outline:2px solid var(--brass); outline-offset:3px; }
+.bills { list-style:none; margin:0; padding:0; border-top:1px solid var(--line); }
+.bills li { padding:14px 0; border-bottom:1px solid var(--line); }
+.bills .r1 { display:flex; justify-content:space-between; gap:12px; font-weight:500; }
+.bills .r2 { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-top:4px; font-size:.86rem; color:var(--muted); }
+.bills .why { margin-top:8px; font-size:.9rem; color:var(--bad); }
+.pill { font-size:.74rem; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+.pill.needs_review { background:var(--warn-bg); color:var(--warn); }
+.pill.approved { background:var(--ok-bg); color:var(--ok); }
+.pill.denied { background:var(--bad-bg); color:var(--bad); }
+.foot { margin-top:34px; font-size:.82rem; color:var(--muted); }
+[hidden] { display:none !important; }
+:focus-visible { outline:2px solid var(--brass); outline-offset:3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="brand">hanu<span>.</span></span>
+    <button class="link" id="signout" hidden>Sign out</button>
+  </header>
+
+  <main id="login" hidden>
+    <h1>Your health savings</h1>
+    <p class="muted" style="margin-top:10px">Sign in with your Hanu ID and PIN to see your balance and send a clinic bill.</p>
+    <form id="login-form">
+      <label>Hanu ID
+        <input type="text" name="hanu_id" autocomplete="username" autocapitalize="characters" placeholder="HN-0000-0000" required>
+      </label>
+      <label>PIN
+        <input type="password" name="pin" inputmode="numeric" autocomplete="current-password" minlength="4" maxlength="12" required>
+      </label>
+      <button class="btn" type="submit">Sign in</button>
+      <div id="login-msg" role="alert"></div>
+    </form>
+    <p class="foot">Forgot your PIN? Message the Hanu team.</p>
+  </main>
+
+  <main id="home" hidden>
+    <section class="card" aria-label="Your Hanu ID and balance">
+      <small>Health balance</small>
+      <div class="bal" id="balance"></div>
+      <div class="row"><span id="who"></span><b id="hid"></b></div>
+      <div class="row" id="lock-row" style="border-top:0;padding-top:6px"><span>Locked until</span><b id="lock"></b></div>
+    </section>
+
+    <input type="file" id="photo" accept="image/*" capture="environment">
+    <label class="btn" for="photo" id="send" style="color:var(--paper);font-size:1.02rem">Send a clinic bill</label>
+    <div id="send-msg" role="status" aria-live="polite"></div>
+    <p class="muted" style="margin-top:12px;font-size:.88rem">Take a clear photo of the whole bill. Hanu pays the clinic, never in cash.</p>
+
+    <h2>Your bills</h2>
+    <ul class="bills" id="bills"></ul>
+    <p class="foot">Hanu is a healthcare savings and payment platform. It is not insurance.</p>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const naira = (kobo) => kobo === null || kobo === undefined ? '—'
+  : '₦' + (kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: kobo % 100 ? 2 : 0 });
+const day = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const STATUS = { needs_review: 'Being checked', approved: 'Paid to clinic', denied: 'Not paid' };
+
+// The session token lives in sessionStorage: it is gone when the tab closes, which
+// suits a phone that may be shared. If storage is blocked the page still works until reload.
+let token = null;
+try { token = sessionStorage.getItem('hanuMember'); } catch {}
+function setToken(value) {
+  token = value;
+  try { value ? sessionStorage.setItem('hanuMember', value) : sessionStorage.removeItem('hanuMember'); } catch {}
+}
+
+function note(id, kind, text) {
+  const box = $(id);
+  box.className = text ? 'msg ' + kind : '';
+  box.textContent = text || '';
+}
+
+async function call(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  let res;
+  try { res = await fetch(path, { ...opts, headers }); }
+  catch { throw new Error('No connection. Check your network and try again.'); }
+  let body = null;
+  try { body = await res.json(); } catch {}
+  if (res.status === 401 && token) { setToken(null); show('login'); }
+  if (!res.ok) throw new Error(body && typeof body.detail === 'string' ? body.detail : 'Something went wrong. Please try again.');
+  return body;
+}
+
+function show(view) {
+  $('login').hidden = view !== 'login';
+  $('home').hidden = view !== 'home';
+  $('signout').hidden = view !== 'home';
+}
+
+function render(me) {
+  $('balance').textContent = naira(me.balance_kobo);
+  $('who').textContent = me.name;
+  $('hid').textContent = me.hanu_id;
+  $('lock-row').hidden = !me.lock_until;
+  $('lock').textContent = day(me.lock_until);
+  const list = $('bills');
+  list.replaceChildren();
+  if (!me.bills.length) {
+    const li = document.createElement('li');
+    li.className = 'muted';
+    li.textContent = 'No bills yet. When you visit a partner clinic, send the bill here.';
+    list.append(li);
+  }
+  for (const b of me.bills) {
+    const li = document.createElement('li');
+    const r1 = document.createElement('div'); r1.className = 'r1';
+    const clinic = document.createElement('span'); clinic.textContent = b.clinic_name || 'Clinic bill';
+    const amount = document.createElement('span'); amount.textContent = naira(b.paid_kobo ?? b.total_kobo);
+    r1.append(clinic, amount);
+    const r2 = document.createElement('div'); r2.className = 'r2';
+    const when = document.createElement('span'); when.textContent = day(b.created_at);
+    const pill = document.createElement('span'); pill.className = 'pill ' + b.status; pill.textContent = STATUS[b.status] || b.status;
+    r2.append(when, pill);
+    li.append(r1, r2);
+    if (b.status === 'approved' && b.total_kobo && b.paid_kobo < b.total_kobo) {
+      const part = document.createElement('div'); part.className = 'r2';
+      part.textContent = `Hanu paid ${naira(b.paid_kobo)} of ${naira(b.total_kobo)}. You pay the clinic the rest.`;
+      li.append(part);
+    }
+    if (b.decision_reason) {
+      const why = document.createElement('div'); why.className = 'why'; why.textContent = b.decision_reason;
+      li.append(why);
+    }
+    list.append(li);
+  }
+}
+
+// Phone photos are large and networks are slow: shrink to 2000px JPEG before sending.
+async function shrink(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((done) => canvas.toBlob(done, 'image/jpeg', 0.85));
+    return blob && blob.size < file.size ? blob : file;
+  } catch { return file; }
+}
+
+$('login-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const form = ev.target, btn = form.querySelector('button');
+  note('login-msg', '', '');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const out = await call('/api/member/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hanu_id: form.hanu_id.value.trim(), pin: form.pin.value }) });
+    setToken(out.token);
+    form.reset();
+    render(await call('/api/member/me'));
+    show('home');
+  } catch (err) { note('login-msg', 'bad', err.message); }
+  btn.disabled = false; btn.textContent = 'Sign in';
+});
+
+let sending = false;
+$('photo').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file || sending) return;
+  sending = true;
+  $('send').setAttribute('aria-disabled', 'true'); $('send').textContent = 'Sending your bill…';
+  note('send-msg', 'wait', 'Sending and reading your bill. Keep this page open.');
+  try {
+    const data = new FormData();
+    data.append('image', await shrink(file), 'bill.jpg');
+    const out = await call('/api/member/bills', { method: 'POST', body: data });
+    render(out);
+    note('send-msg', out.status === 'approved' ? 'ok' : 'wait', out.message);
+  } catch (err) { note('send-msg', 'bad', err.message); }
+  sending = false;
+  $('send').removeAttribute('aria-disabled'); $('send').textContent = 'Send a clinic bill';
+});
+
+$('signout').addEventListener('click', async () => {
+  try { await call('/api/member/logout', { method: 'POST' }); } catch {}
+  setToken(null); note('send-msg', '', ''); show('login');
+});
+
+(async () => {
+  if (!token) return show('login');
+  try { render(await call('/api/member/me')); show('home'); } catch { show('login'); }
+})();
+</script>
+</body>
+</html>

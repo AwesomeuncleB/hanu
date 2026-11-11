@@ -1,6 +1,7 @@
 """Settings, read from the environment at call time.
 
-HANU_DATA_DIR                 where the database and uploaded bills live (default backend/data)
+HANU_DATA_DIR                 where the database and uploaded bills live (default backend/data;
+                              on Vercel /tmp/hanu, which is wiped whenever the function restarts)
 HANU_SHADOW_MODE              "1" (default): every bill goes to a human, the rules only recommend.
                               "0": clean bills are approved by the rules without review.
 HANU_AUTO_APPROVE_CAP_NAIRA   largest bill the rules may approve on their own (default 20000)
@@ -17,7 +18,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 def data_dir() -> Path:
-    path = Path(os.environ.get("HANU_DATA_DIR", BACKEND_DIR / "data"))
+    # Vercel's disk is read-only apart from /tmp, and /tmp does not survive a restart.
+    default = Path("/tmp/hanu") if os.environ.get("VERCEL") else BACKEND_DIR / "data"
+    path = Path(os.environ.get("HANU_DATA_DIR", default))
     (path / "uploads").mkdir(parents=True, exist_ok=True)
     return path
 
@@ -48,3 +51,7 @@ def review_token() -> str | None:
 
 def seed_demo() -> bool:
     return os.environ.get("HANU_SEED_DEMO", "0") == "1"
+
+
+def storage_is_temporary() -> bool:
+    return bool(os.environ.get("VERCEL")) and "HANU_DATA_DIR" not in os.environ

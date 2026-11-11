@@ -47,6 +47,7 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setenv("HANU_SEED_DEMO", "1")
     monkeypatch.setenv("HANU_SHADOW_MODE", "0")
     monkeypatch.delenv("HANU_REVIEW_TOKEN", raising=False)
+    monkeypatch.setattr(db, "PIN_ITERATIONS", 1000)
     db.init()
     state = {"result": extract.ExtractionResult(bill(), "fake-model")}
     monkeypatch.setattr(extract, "extract_bill", lambda _bytes, _type: state["result"])
