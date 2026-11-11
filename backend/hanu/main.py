@@ -76,6 +76,13 @@ def landing_styles():
     return FileResponse(STATIC / "styles.css")
 
 
+@app.get("/favicon.svg")
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(STATIC / "favicon.svg", media_type="image/svg+xml",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/member")
 def member_page():
     return FileResponse(STATIC / "member.html")
